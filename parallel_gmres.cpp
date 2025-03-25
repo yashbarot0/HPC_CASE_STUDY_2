@@ -1,37 +1,37 @@
 #include <iostream>
 #include <vector>
-#include <cmath>
-#include <mpi.h>
+#include <cmath>    // for abs, sqrt
+#include <mpi.h>    // for MPI
 
 using namespace std;
 
-// Parallel matrix-vector multiplication for tridiagonal matrix
+// Parallel matrix-vector multiplication for tridiagonal matrix 
 void parallel_matvec(const vector<double>& x_local, vector<double>& Ax_local, int local_n, MPI_Comm comm) {
     int rank, size;
     MPI_Comm_rank(comm, &rank);
     MPI_Comm_size(comm, &size);
 
-    double left_val = 0.0, right_val = 0.0;
+    double left_val = 0.0, right_val = 0.0; // Boundary values from neighbors
 
-    // Exchange boundary values with neighbors
+    // Exchange boundary values with neighbors (if they exist) 
     if (rank > 0) {
-        MPI_Send(&x_local[0], 1, MPI_DOUBLE, rank-1, 0, comm);
-        MPI_Recv(&left_val, 1, MPI_DOUBLE, rank-1, 0, comm, MPI_STATUS_IGNORE);
+        MPI_Send(&x_local[0], 1, MPI_DOUBLE, rank-1, 0, comm); // Send left boundary value
+        MPI_Recv(&left_val, 1, MPI_DOUBLE, rank-1, 0, comm, MPI_STATUS_IGNORE);  // Receive left boundary value
     }
     if (rank < size-1) {
-        MPI_Send(&x_local.back(), 1, MPI_DOUBLE, rank+1, 0, comm);
-        MPI_Recv(&right_val, 1, MPI_DOUBLE, rank+1, 0, comm, MPI_STATUS_IGNORE);
+        MPI_Send(&x_local.back(), 1, MPI_DOUBLE, rank+1, 0, comm);  // Send right boundary value
+        MPI_Recv(&right_val, 1, MPI_DOUBLE, rank+1, 0, comm, MPI_STATUS_IGNORE);  // Receive right boundary value
     }
 
     // Compute local part of A*x
-    Ax_local.resize(local_n);
-    for (int i = 0; i < local_n; ++i) {
-        Ax_local[i] = -4.0 * x_local[i];
-        if (i > 0 || (i == 0 && rank > 0)) {
-            Ax_local[i] += (i > 0) ? x_local[i-1] : left_val;
+    Ax_local.resize(local_n);  // Resize output vector
+    for (int i = 0; i < local_n; ++i) {  
+        Ax_local[i] = -4.0 * x_local[i];  // Diagonal term
+        if (i > 0 || (i == 0 && rank > 0)) {   
+            Ax_local[i] += (i > 0) ? x_local[i-1] : left_val;  // Lower diagonal term
         }
         if (i < local_n-1 || (i == local_n-1 && rank < size-1)) {
-            Ax_local[i] += (i < local_n-1) ? x_local[i+1] : right_val;
+            Ax_local[i] += (i < local_n-1) ? x_local[i+1] : right_val;  // Upper diagonal term
         }
     }
 }
@@ -41,7 +41,7 @@ tuple<vector<double>, vector<double>> parallel_gmres(int n, const vector<double>
     int rank;
     MPI_Comm_rank(comm, &rank);
 
-    vector<double> x(local_n, 0.0); // Initial guess x0 = 0
+    vector<double> x(local_n, 0.0); // Initial guess x0 = 0 
     vector<double> residual_norms;
 
     // Compute initial residual r0 = b - A*x (x is zero, so r0 = b)
@@ -83,7 +83,7 @@ tuple<vector<double>, vector<double>> parallel_gmres(int n, const vector<double>
             for (int k = 0; k < local_n; ++k) {
                 local_dot += Q[i][k] * v_local[k];
             }
-            MPI_Allreduce(MPI_IN_PLACE, &local_dot, 1, MPI_DOUBLE, MPI_SUM, comm);
+            MPI_Allreduce(MPI_IN_PLACE, &local_dot, 1, MPI_DOUBLE, MPI_SUM, comm); // Reduce dot product
             H[i][j] = local_dot;
 
             // Orthogonalize v_local
@@ -96,7 +96,7 @@ tuple<vector<double>, vector<double>> parallel_gmres(int n, const vector<double>
         double local_norm_sq = 0.0;
         for (double val : v_local) local_norm_sq += val * val;
         double norm_v;
-        MPI_Allreduce(&local_norm_sq, &norm_v, 1, MPI_DOUBLE, MPI_SUM, comm);
+        MPI_Allreduce(&local_norm_sq, &norm_v, 1, MPI_DOUBLE, MPI_SUM, comm);  // Reduce norm squared
         H[j+1][j] = sqrt(norm_v);
 
         // Normalize v_local to get Q[j+1]
@@ -138,8 +138,8 @@ tuple<vector<double>, vector<double>> parallel_gmres(int n, const vector<double>
         g[j] = temp;
 
         // Update residual norm
-        double residual_norm = abs(g[j+1]);
-        residual_norms.push_back(residual_norm / norm_b);
+        double residual_norm = abs(g[j+1]); // Last entry in g is the residual norm
+        residual_norms.push_back(residual_norm / norm_b);  // Store relative residual norm 
 
         // Check stopping criterion
         if (residual_norm / norm_b < tol) {
@@ -169,15 +169,15 @@ tuple<vector<double>, vector<double>> parallel_gmres(int n, const vector<double>
     return make_tuple(x, residual_norms);
 }
 
-int main(int argc, char** argv) {
-    MPI_Init(&argc, &argv);
-    int rank, size;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    MPI_Comm_size(MPI_COMM_WORLD, &size);
+int main(int argc, char** argv) {  
+    MPI_Init(&argc, &argv); // Initialize MPI 
+    int rank, size;        // Process rank and total number of processes
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);  // Get process rank
+    MPI_Comm_size(MPI_COMM_WORLD, &size);  // Get total number of processes
 
     int n = 256;    // Global matrix size
     int m = 128;    // Max iterations (n/2)
-    double tol = 1e-6;
+    double tol = 1e-6;  // Tolerance for stopping criterion (relative residual) 
 
     // Parse command line arguments
     if (argc > 1) n = atoi(argv[1]);
@@ -186,7 +186,7 @@ int main(int argc, char** argv) {
 
     // Compute local size
     int local_n = n / size;
-    if (rank == size-1) local_n = n - local_n*(size-1); // Handle remainder
+    if (rank == size-1) local_n = n - local_n*(size-1); // Handle remainder if n is not divisible by size
 
     // Initialize local b vector
     vector<double> b_local(local_n);
@@ -199,10 +199,10 @@ int main(int argc, char** argv) {
         }
     }
 
-    // Run GMRES
-    vector<double> x_local;
+    // Run GMRES solver in parallel 
+    vector<double> x_local; // Local part of solution
     vector<double> res_norms;
-    tie(x_local, res_norms) = parallel_gmres(n, b_local, local_n, m, tol, MPI_COMM_WORLD);
+    tie(x_local, res_norms) = parallel_gmres(n, b_local, local_n, m, tol, MPI_COMM_WORLD);  // Call parallel GMRES
 
     // Output results (only root process)
     if (rank == 0) {

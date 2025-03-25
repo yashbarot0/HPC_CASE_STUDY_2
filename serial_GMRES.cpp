@@ -1,7 +1,7 @@
 #include <iostream>
 #include <vector>
-#include <cmath>
-#include <tuple>
+#include <cmath>  // For std::abs, std::sqrt
+#include <tuple>  // For returning multiple values from a function
 #include <fstream>
 
 // Function to compute A*x for the given tridiagonal matrix A
@@ -44,10 +44,10 @@ std::vector<double> compute_b(int n) {
     return b;
 }
 
-// GMRES function
+// Function to solve the system Ax = b using GMRES with m iterations 
 std::tuple<std::vector<double>, std::vector<double>> gmres(int n, const std::vector<double>& b, int m) {
-    std::vector<double> x(n, 0.0); // Initial guess x0 = 0
-    std::vector<double> residual_norms;
+    std::vector<double> x(n, 0.0); // Initial guess x0 = 0 
+    std::vector<double> residual_norms; 
 
     // Compute initial residual r0 = b - A*x (x is zero, so r0 = b)
     std::vector<double> r0 = b;
@@ -57,12 +57,12 @@ std::tuple<std::vector<double>, std::vector<double>> gmres(int n, const std::vec
     double norm_b = beta;
     if (beta == 0.0) {
         residual_norms.push_back(0.0);
-        return std::make_tuple(x, residual_norms);
+        return std::make_tuple(x, residual_norms); // Return if b = 0 
     }
 
     // Initialize Q and H
-    std::vector<std::vector<double>> Q(m + 1, std::vector<double>(n));
-    std::vector<std::vector<double>> H(m + 1, std::vector<double>(m));
+    std::vector<std::vector<double>> Q(m + 1, std::vector<double>(n)); // Q[m+1][n]
+    std::vector<std::vector<double>> H(m + 1, std::vector<double>(m)); // H[m+1][m] 
 
     // Q[0] = r0 / beta
     for (int i = 0; i < n; ++i) {
@@ -75,12 +75,12 @@ std::tuple<std::vector<double>, std::vector<double>> gmres(int n, const std::vec
     std::vector<double> g(m + 1, 0.0);
     g[0] = beta;
 
-    residual_norms.push_back(beta / norm_b);
+    residual_norms.push_back(beta / norm_b); // Initial residual norm
 
     for (int j = 0; j < m; ++j) {
         // Arnoldi iteration
         std::vector<double> v(n);
-        matrix_vector_mult(Q[j], v, n);
+        matrix_vector_mult(Q[j], v, n); // Compute A * Q[j]
 
         for (int i = 0; i <= j; ++i) {
             // Compute H[i][j] = dot product of Q[i] and v
@@ -111,7 +111,7 @@ std::tuple<std::vector<double>, std::vector<double>> gmres(int n, const std::vec
 
         // Compute new Givens rotation for H[j][j] and H[j+1][j]
         double c, s;
-        generate_givens_rotation(H[j][j], H[j+1][j], c, s);
+        generate_givens_rotation(H[j][j], H[j+1][j], c, s);     // Compute Givens rotation for H[j][j] and H[j+1][j]
         cs[j] = c;
         sn[j] = s;
 
@@ -126,8 +126,8 @@ std::tuple<std::vector<double>, std::vector<double>> gmres(int n, const std::vec
         g[j] = temp;
 
         // Update the residual norm
-        double residual_norm = std::abs(g[j+1]);
-        residual_norms.push_back(residual_norm / norm_b);
+        double residual_norm = std::abs(g[j+1]); // residual_norm = |g[j+1]|
+        residual_norms.push_back(residual_norm / norm_b); // residual_norm / norm_b
     }
 
     // Solve the upper triangular system R y = g[0..m-1]
@@ -148,19 +148,19 @@ std::tuple<std::vector<double>, std::vector<double>> gmres(int n, const std::vec
         }
     }
 
-    return std::make_tuple(x, residual_norms);
+    return std::make_tuple(x, residual_norms); // Return the solution x and residual norms 
 }
 
 int main() {
-    std::vector<int> sizes = {8, 16, 32, 64, 128, 256};
-    std::ofstream outfile("residual_norms.txt");
+    std::vector<int> sizes = {8, 16, 32, 64, 128, 256}; // Problem sizes to test GMRES 
+    std::ofstream outfile("residual_norms.txt"); 
 
     for (int n : sizes) {
-        int m = n / 2;
-        std::vector<double> b = compute_b(n);
+        int m = n / 2; // Number of iterations for GMRES
+        std::vector<double> b = compute_b(n); 
         auto [x, res_norms] = gmres(n, b, m);
         
-        outfile << "n = " << n << "\n";
+        outfile << "n = " << n << "\n"; // save residual norms to file for plotting.
         for (double rn : res_norms) {
             outfile << rn << " ";
         }
