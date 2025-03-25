@@ -1,2 +1,0 @@
-# HPC_CASE_STUDY_2
-CASE_STUDY_2 The GMRES algorithm
